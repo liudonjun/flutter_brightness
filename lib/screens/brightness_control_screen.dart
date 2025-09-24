@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:window_manager/window_manager.dart';
 import 'dart:async';
 import '../services/serial_service.dart';
 import '../services/brightness_service.dart';
@@ -39,7 +40,7 @@ class BrightnessControlScreen extends StatefulWidget {
 /// - 亮度控制和校准数据
 /// - 用户设置（自启动、自动连接等）
 /// - UI状态和日志管理
-class _BrightnessControlScreenState extends State<BrightnessControlScreen> {
+class _BrightnessControlScreenState extends State<BrightnessControlScreen> with WindowListener {
   static const String _lastPortKey = 'last_connected_port';
   static const String _autoConnectKey = 'auto_connect_enabled';
 
@@ -67,6 +68,7 @@ class _BrightnessControlScreenState extends State<BrightnessControlScreen> {
   @override
   void initState() {
     super.initState();
+    windowManager.addListener(this);
     _addLog('亮度控制应用已启动');
     _updateCurrentBrightness();
     _loadCalibrationData();
@@ -157,10 +159,19 @@ class _BrightnessControlScreenState extends State<BrightnessControlScreen> {
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
     _serialSubscription?.cancel();
     _brightnessDebounceTimer?.cancel();
     _serialService.dispose();
     super.dispose();
+  }
+
+  @override
+  Future<bool> onWindowClose() async {
+    print('Window close event triggered - hiding to tray');
+    _addLog('检测到窗口关闭事件，隐藏到托盘');
+    await windowManager.hide();
+    return false; // 返回 false 阻止窗口关闭，而是隐藏到托盘
   }
 
   void _updateCurrentBrightness() {
@@ -366,7 +377,8 @@ class _BrightnessControlScreenState extends State<BrightnessControlScreen> {
 
     setState(() {
       _logs.add('[$timestamp] $message');
-      if (_logs.length > 100) {
+      // 限制日志条数，超过50条时删除最旧的
+      if (_logs.length > 50) {
         _logs.removeAt(0);
       }
     });
